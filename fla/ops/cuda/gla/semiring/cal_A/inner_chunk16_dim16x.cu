@@ -68,8 +68,7 @@ __global__ void fwd_inner_chunk16_dim16x(int batchSize, int M, int N_K,
 template <typename scalar_t>
 __global__ void bwd_inner_chunk16_dim16x(int batchSize, int M, int N_K, 
                                      scalar_t *Q, scalar_t *K, float *G, 
-                                     scalar_t *DQK, scalar_t *DQ, scalar_t *DK, 
-                                     float *DG
+                                     scalar_t *DQK, scalar_t *DQ, scalar_t *DK 
                                     ) {
 
   // Batch index
@@ -92,7 +91,6 @@ __global__ void bwd_inner_chunk16_dim16x(int batchSize, int M, int N_K,
   K += batchIdx * K_Stride;
   DK += batchIdx * K_Stride;
   G += batchIdx * K_Stride;
-  DG += batchIdx * K_Stride;
   
   DQK += batchIdx * M * M;
   QK_tile[threadRow][threadCol] = (threadCol <= threadRow) ? (float)DQK[threadRow * M + threadCol] : 0.0;
@@ -123,13 +121,11 @@ __global__ void bwd_inner_chunk16_dim16x(int batchSize, int M, int N_K,
     __syncthreads();    
     DQ[threadRow * N_K + threadCol] = (scalar_t)threadResults_dQ;
     DK[threadRow * N_K + threadCol] = (scalar_t)threadResults_dK;
-    DG[threadRow * N_K + threadCol] = (threadResults_dQ * Q_tile[threadRow][threadCol] - threadResults_dK * K_tile[threadRow][threadCol]);
     Q += 16;
     K += 16;
     G += 16;
     DQ += 16;
     DK += 16;
-    DG += 16;
     __syncthreads();
   }  
 }
@@ -141,7 +137,6 @@ torch::Tensor g_K, torch::Tensor DQK)
  {
     auto DQ = torch::empty_like(Q);
     auto DK = torch::empty_like(K);
-    auto Dg_K = torch::empty_like(g_K);
     
     int B_size = Q.size(0); // This is the batch size dimension.
     int H_size = Q.size(1); // This is the head dimension
@@ -160,8 +155,7 @@ torch::Tensor g_K, torch::Tensor DQK)
                         g_K.data_ptr<float>(),
                         DQK.data_ptr<bf16>(),
                         DQ.data_ptr<bf16>(), 
-                        DK.data_ptr<bf16>(),
-                        Dg_K.data_ptr<float>()
+                        DK.data_ptr<bf16>()
                         );     
             break;
         default:
@@ -172,12 +166,11 @@ torch::Tensor g_K, torch::Tensor DQK)
                         g_K.data_ptr<float>(),
                         DQK.data_ptr<scalar_t>(),
                         DQ.data_ptr<scalar_t>(), 
-                        DK.data_ptr<scalar_t>(),
-                        Dg_K.data_ptr<float>()
+                        DK.data_ptr<scalar_t>()
                         );     
             }));
     };               
-    return {DQ, DK, Dg_K};
+    return {DQ, DK};
 }
 
 torch::Tensor fwd_cuda(torch::Tensor& Q,

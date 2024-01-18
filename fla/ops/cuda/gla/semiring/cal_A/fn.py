@@ -38,5 +38,6 @@ if "__main__" == __name__:
                     dtype=dtype, requires_grad=True).cuda()
     o = semiring_cal_A.forward(q, k, g)
     do = torch.randn_like(o)
-    dq, dk, dg = semiring_cal_A.backward(q, k, g, do)
+    dq, dk = semiring_cal_A.backward(q, k, g, do)
+    dg = dq*q-dk*k
     breakpoint()
