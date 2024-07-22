@@ -475,7 +475,7 @@ if __name__ == "__main__":
     th.manual_seed(42)
     device = "cuda" if th.cuda.is_available() else "cpu"
     dtype = th.float32
-    B, H, L, D = 1, 2, 3, 16
+    B, H, L, D = 1, 2, 16, 128
     q = th.randn(B, H, L, D, dtype=dtype, device=device)
     k = th.randn(B, H, L, D, dtype=dtype, device=device)
     v = th.randn(B, H, L, D, dtype=dtype, device=device)
@@ -503,7 +503,7 @@ if __name__ == "__main__":
     # fw:
     with th.no_grad():
         o_triton, _ = fused_recurrent_linear_attn_delta_rule(q, k, v, beta, w)
-    print(o - o_triton)
+    print(f"All matching the fp32 torch: {(o - o_triton).amax()}")
     breakpoint()
 
 
