@@ -18,6 +18,98 @@ def contiguous(fn):
 
 
 @triton.jit
+def fused_recurrent_fwd_kernel_original(
+    # B: batch_size, H: n_heads, T: seq_len, D: d_head
+    q,  # query [B, H, L, D_head_K]
+    k,  # key [B, H, L, D_head_V]
+    v,  # value [B, H, L, D_head_V].
+    beta,  # beta [B, H, L]
+    alpha, # alpha [B, H, L] (potentially D_head_K)
+    o,  # output [B, H, L, D_head_V]
+    initial_state,
+    final_state,  # final hidden state [B, H, D_head_K, D_head_V]
+
+
+    s_qk_h,  # stride size: L * D_head_K
+    s_qk_t,  # stride size: D_head_K
+    s_qk_d,  # stride size: 1
+
+    s_vo_h,  # stride size: L * D_head_V
+    s_vo_t,  # stride size: D_head_V
+    s_vo_d,  # stride size: 1
+
+    B,  # batch size
+    H,  # n_heads
+    T,  # seq_len
+    scale,  # D_head_K ** -0.5
+    BK: tl.constexpr,  # BLOCK SIZE along the K dimension
+    BV: tl.constexpr,  # BLOCK SIZE along the V dimension
+    DK: tl.constexpr,  # D_head_K
+    DV: tl.constexpr,  # D_head_V
+    USE_INITIAL_STATE: tl.constexpr,  # whether to use initial state
+    STORE_FINAL_STATE: tl.constexpr,  # whether to store final state
+):
+
+    # indices
+    i_v, i_k, i_bh = tl.program_id(0), tl.program_id(1), tl.program_id(2)
+
+    p_q = q + i_bh * s_qk_h + i_k * BK + tl.arange(0, BK)
+    p_k = k + i_bh * s_qk_h + i_k * BK + tl.arange(0, BK)
+    p_v = v + i_bh * s_vo_h + i_v * BV + tl.arange(0, BV)
+    p_beta = beta + i_bh * T
+    p_alpha = alpha + i_bh * T
+    p_o = o + (i_bh + i_k * B * H) * s_vo_h + i_v * BV + tl.arange(0, BV)
+
+    mask_bk = (i_k * BK + tl.arange(0, BK)) < DK
+    mask_bv = (i_v * BV + tl.arange(0, BV)) < DV
+    mask_kv = mask_bk[None, :] & mask_bv[:, None]
+
+    h = tl.zeros([BV, BK], dtype=tl.float32)
+
+    if USE_INITIAL_STATE:
+        p_init_s = initial_state + i_bh * DK * DV + \
+            (i_k * BK + tl.arange(0, BK)[None, :]) * \
+            DV + (i_v * BV + tl.arange(0, BV)[:, None])
+        h += tl.load(p_init_s, mask=mask_kv, other=0).to(tl.float32)
+
+    for _ in range(0, T):
+        _k = tl.load(p_k, mask=mask_bk, other=0).to(tl.float32)
+        _v = tl.load(p_v, mask=mask_bv, other=0).to(tl.float32)
+        _q = tl.load(p_q, mask=mask_bk, other=0).to(tl.float32) * scale
+
+        # FIXME: hypnopump@ this is the momentum version (to state and delta, harder gradient)
+        h *= tl.load(p_alpha).to(tl.float32)
+
+        _v_minus = tl.sum(h * _k[None, :], axis=1)
+        _v -= _v_minus
+        _beta = tl.load(p_beta).to(tl.float32)
+        # in-place overwrite
+        tl.store(p_v, _v.to(p_v.dtype.element_ty), mask=mask_bv)
+        _v *= _beta
+        h += _k[None, :] * _v[:, None]
+
+        # FIXME: hypnopump@ this is the decayed version (only to state)
+        # h = h * alpha[None, None] + _k[None, :] * _v[:, None]
+
+        _o = h * _q[None, :]
+        _o = tl.sum(_o, axis=1)
+        tl.store(p_o, _o.to(p_o.dtype.element_ty), mask=mask_bv)
+
+        p_q += DK
+        p_k += DK
+        p_o += DV
+        p_v += DV
+        p_beta += 1
+        p_alpha += 1
+
+    if STORE_FINAL_STATE:
+        p_final_s = final_state + i_bh * DK * DV + \
+            (i_k * BK + tl.arange(0, BK)[None, :]) * \
+            DV + (i_v * BV + tl.arange(0, BV)[:, None])
+        tl.store(p_final_s, h.to(p_final_s.dtype.element_ty), mask=mask_kv)
+
+
+@triton.jit
 def fused_recurrent_fwd_kernel(
     # B: batch_size, H: n_heads, T: seq_len, D: d_head
     q,  # query [B, H, L, D_head_K]
@@ -259,7 +351,7 @@ class FusedRecurrentFunction(torch.autograd.Function):
         batch_size, n_heads, seq_len, d_head_qk = q.shape
         d_head_v = v.shape[-1]
 
-        scale = d_head_qk ** -0.5
+        scale = 1. # d_head_qk ** -0.5
         BK, BV = triton.next_power_of_2(d_head_qk), min(triton.next_power_of_2(d_head_v), 8)
         NK, NV = triton.cdiv(d_head_qk, BK), triton.cdiv(d_head_v, BV)
         num_stages = 1
@@ -294,7 +386,7 @@ class FusedRecurrentFunction(torch.autograd.Function):
         q, k, v, beta, alpha, initial_state = ctx.saved_tensors
         batch_size, n_heads, seq_len, d_head_qk = q.shape
         d_head_v = v.shape[-1]
-        scale = d_head_qk ** -0.5
+        scale = 1. # d_head_qk ** -0.5
         BK, BV = triton.next_power_of_2(d_head_qk), min(triton.next_power_of_2(d_head_v), 32)
         NK, NV = triton.cdiv(d_head_qk, BK), triton.cdiv(d_head_v, BV)
         assert NK == 1, "NK > 1 is not supported yet"
