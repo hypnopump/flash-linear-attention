@@ -387,7 +387,7 @@ if __name__ == "__main__":
     q = th.randn(B, H, L, D, dtype=dtype, device=device)
     k = th.randn(B, H, L, D, dtype=dtype, device=device)
     v = th.randn(B, H, L, D, dtype=dtype, device=device)
-    w = th.randn(B, H, L, D, dtype=dtype, device=device)
+    w = th.randn(B, H, L, 1, dtype=dtype, device=device)
     w = (0.5 + 0.5 * F.sigmoid(w))
     beta = F.sigmoid(th.randn(B, H, L, device=device, dtype=dtype))
     state = th.zeros(B, H, D, D).to(q)
@@ -410,8 +410,7 @@ if __name__ == "__main__":
     ### compute triton
     # fw:
     with th.no_grad():
-        o_triton, _ = fused_recurrent_linear_attn_delta_rule(q, k, v, beta, w, scale=1.)
-    breakpoint()
+        o_triton, _ = fused_recurrent_linear_attn_delta_rule(q, k, v, beta, w)
     print(o - o_triton)
     breakpoint()
 
