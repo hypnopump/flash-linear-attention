@@ -337,7 +337,7 @@ if __name__ == "__main__":
         Outputs: (outs, state)
         """
         B, H, L, D = q.shape
-        outs = th.empty_like(q)
+        outs = th.empty_like(q).to(q)
         if state is None:
             state = th.zeros(B, H, D, D).to(q)
         for i in range(L):
