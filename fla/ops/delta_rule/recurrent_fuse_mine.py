@@ -172,7 +172,7 @@ def fused_recurrent_fwd_kernel(
         # FIXME: hypnopump@ this is the momentum version (to state and delta, harder gradient)
         h *= tl.load(p_alpha).to(tl.float32)
 
-        _v = _v - _k[None, :] @ h
+        _v = _v - tl.dot(_k[None, :], h)
         _beta = tl.load(p_beta).to(tl.float32)
         # in-place overwrite
         tl.store(p_v, _v.to(p_v.dtype.element_ty), mask=mask_bv)
@@ -182,7 +182,7 @@ def fused_recurrent_fwd_kernel(
         # FIXME: hypnopump@ this is the decayed version (only to state)
         # h = h * alpha[None, None] + _k[None, :] * _v[:, None]
 
-        _o = _q[None, :] @ h
+        _o = tl.dot(_q[None, :], h)
         tl.store(p_o, _o.to(p_o.dtype.element_ty), mask=mask_bv)
 
         p_q += DK
