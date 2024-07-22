@@ -411,7 +411,7 @@ if __name__ == "__main__":
     # fw:
     with th.no_grad():
         o_triton = fused_recurrent_linear_attn_delta_rule(q, k, v, beta, w)
-
+    breakpoint()
     print(o - o_triton)
     breakpoint()
 
