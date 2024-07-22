@@ -475,7 +475,7 @@ if __name__ == "__main__":
     th.manual_seed(42)
     device = "cuda" if th.cuda.is_available() else "cpu"
     dtype = th.float32
-    B, H, L, D = 1, 2, 3, 4
+    B, H, L, D = 1, 2, 3, 16
     q = th.randn(B, H, L, D, dtype=dtype, device=device)
     k = th.randn(B, H, L, D, dtype=dtype, device=device)
     v = th.randn(B, H, L, D, dtype=dtype, device=device)
