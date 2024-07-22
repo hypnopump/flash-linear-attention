@@ -363,7 +363,7 @@ class FusedRecurrentFunction(torch.autograd.Function):
             final_state = None
 
         grid = (NV, NK, batch_size * n_heads)
-        fused_recurrent_fwd_kernel[grid](
+        fused_recurrent_fwd_kernel_original[grid](
             q, k, v, beta, alpha, o, initial_state, final_state,
             q.stride(1), q.stride(2), q.stride(3),
             v.stride(1), v.stride(2), v.stride(3),
