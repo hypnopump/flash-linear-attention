@@ -339,7 +339,7 @@ if __name__ == "__main__":
         B, H, L, D = q.shape
         outs = th.empty_like(q)
         if state is None:
-            state = th.zeros(B, H, D, D)
+            state = th.zeros(B, H, D, D).to(q)
         for i in range(L):
             wi = w[..., i, :]
             qi = q[..., i, :]
@@ -375,6 +375,7 @@ if __name__ == "__main__":
 
     ### compute triton
     # fw:
+    breakpoint()
     with th.no_grad():
         o_triton = fused_recurrent_linear_attn_delta_rule(q, k, v, beta)
 
