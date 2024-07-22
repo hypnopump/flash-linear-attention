@@ -370,11 +370,11 @@ if __name__ == "__main__":
             qi = q[..., i, :]
             ki = k[..., i, :]
             vi = v[..., i, :]
-            bi = beta[..., [i]]
+            bi = beta[..., i]
 
-            sw = th.einsum('...c,...cd->...cd', wi, state)
-            abskk = th.einsum('...c,...ed,...e,...c->...cd', wi * bi, state, ki, ki)
-            bkv = th.einsum('bh,bhd,bhc->bhcd', bi.squeeze(-1), vi, ki)
+            sw = th.einsum('...,...cd->...cd', wi, state)
+            abskk = th.einsum('...,...ed,...e,...c->...cd', bi, sw, ki, ki)
+            bkv = th.einsum('bh,bhd,bhc->bhcd', bi, vi, ki)
             state = sw - abskk + bkv
             outs[..., i, :] = th.einsum('...c,...cd->...d', qi, state)
 
@@ -387,7 +387,7 @@ if __name__ == "__main__":
     q = th.randn(B, H, L, D, dtype=dtype, device=device)
     k = th.randn(B, H, L, D, dtype=dtype, device=device)
     v = th.randn(B, H, L, D, dtype=dtype, device=device)
-    w = th.randn(B, H, L, 1, dtype=dtype, device=device)
+    w = th.randn(B, H, L, dtype=dtype, device=device)
     w = (0.5 + 0.5 * F.sigmoid(w))
     beta = F.sigmoid(th.randn(B, H, L, device=device, dtype=dtype))
     state = th.zeros(B, H, D, D).to(q)
