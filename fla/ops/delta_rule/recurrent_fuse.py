@@ -365,7 +365,7 @@ if __name__ == "__main__":
     w = th.randn(B, H, L, D, dtype=dtype, device=device)
     w = (0.5 + 0.5 * F.sigmoid(w))
     beta = F.sigmoid(th.randn(B, H, L, device=device, dtype=dtype))
-    state = th.zeros(B, H, D, D)
+    state = th.zeros(B, H, D, D).to(q)
     q.requires_grad = True
     k.requires_grad = True
     v.requires_grad = True
