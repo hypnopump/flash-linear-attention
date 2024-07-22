@@ -366,7 +366,7 @@ if __name__ == "__main__":
         if state is None:
             state = th.zeros(B, H, D, D).to(q)
         for i in range(L):
-            wi = w[..., i, :]
+            wi = w[..., i]
             qi = q[..., i, :]
             ki = k[..., i, :]
             vi = v[..., i, :]
