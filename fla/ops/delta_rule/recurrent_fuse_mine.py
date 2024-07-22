@@ -381,7 +381,7 @@ if __name__ == "__main__":
         return outs, state
 
 
-    device = "cpu"
+    device = "cuda" if th.cuda.is_available() else "cpu"
     dtype = th.float32
     B, H, L, D = 1, 2, 3, 4
     q = th.randn(B, H, L, D, dtype=dtype, device=device)
