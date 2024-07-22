@@ -100,6 +100,7 @@ def fused_recurrent_fwd_kernel(
         p_o += DV
         p_v += DV
         p_beta += 1
+        p_alpha += 1
 
     if STORE_FINAL_STATE:
         p_final_s = final_state + i_bh * DK * DV + \
@@ -381,6 +382,7 @@ if __name__ == "__main__":
         return outs, state
 
 
+    th.manual_seed(42)
     device = "cuda" if th.cuda.is_available() else "cpu"
     dtype = th.float32
     B, H, L, D = 1, 2, 3, 4
