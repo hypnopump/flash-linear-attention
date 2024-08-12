@@ -500,7 +500,7 @@ if __name__ == "__main__":
     do = o.grad
 
     ### compute triton
-    # fw:
+    # fw: not correct after dim partition (dim=4 is ok)
     with th.no_grad():
         o_triton, _ = fused_recurrent_linear_attn_delta_rule(q, k, v, beta, w)
     print(f"All matching the fp32 torch: {(o - o_triton).amax()}")
