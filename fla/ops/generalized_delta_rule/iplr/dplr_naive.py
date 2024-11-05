@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import torch
-from einops import rearrange
+
+# from einops import rearrange
 
 
 # S_t = S_{t-1} @ (W + alpha_t beta_t^T) + v_t k_t^T
@@ -34,46 +35,49 @@ def dplr_recurrence(r, w,  k, v, alpha, beta, initial_state=None, output_final_s
 
 
 def dplr_chunkwise(r, w, k, v, alpha, beta, initial_state=None, output_final_state=True, chunk_size=32):
-    # FIXME: hypnopump@ needs working!
-    b, h, l, d_k = r.shape
-    d_v = v.shape[-1]
-    r = r * (d_k ** -0.5)
-    v = v
-    assert l % chunk_size == 0
-
-    # note that diagonal is masked.
-    mask = torch.triu(torch.ones(chunk_size, chunk_size, dtype=torch.bool, device=r.device), diagonal=0)
-    r, w, k, v, alpha, beta = map(lambda x: rearrange(x, 'b h (n c) d -> b h n c d', c=chunk_size), [r, w, k, v, alpha, beta])
-
-    v2 = (alpha @ k.transpose(-1, -2)).masked_fill_(mask, 0) @ v
-    attn = (alpha @ beta.transpose(-1, -2)).masked_fill(mask, 0)
-    for i in range(1, chunk_size):
-        attn[..., i, :i] = attn[..., i, :i] + (attn[..., i, :, None].clone() * attn[..., :, :i].clone()).sum(-2)
-
-    # FIXME: hypnopump@ needs working!
-    # FIXME: add decay in the diagonal' idk!
-    attn = attn + torch.eye(chunk_size, dtype=torch.float, device=r.device)
-    u = attn @ v2
-    w = attn @ alpha
-    S = k.new_zeros(b, h, d_k, d_v)
-    o = torch.zeros_like(v)
-
-    if initial_state is not None:
-        S += initial_state
-
-    mask = torch.triu(torch.ones(chunk_size, chunk_size, dtype=torch.bool, device=r.device), diagonal=1)
-    for i in range(0, l // chunk_size):
-        r_i, k_i, v_i, u_i, w_i, beta_i = r[:, :, i], k[:, :, i], v[:, :, i], u[:, :, i], w[:, :, i], beta[:, :, i]
-        o_1 = (r_i @ k_i.transpose(-1, -2)).masked_fill_(mask, 0) @ v_i
-        v2_i = u_i + w_i @ S
-        o_2 = (r_i @ beta_i.transpose(-1, -2)).masked_fill_(mask, 0) @ (v2_i)
-        o_3 = r_i @ S
-        o[:, :, i] = o_1 + o_2 + o_3
-        # FIXME: hypnopump@ needs working!
-        # FIXME: need to play scaled decay here
-        S = S + k_i.transpose(-1, -2) @ v_i + beta_i.transpose(-1, -2) @ v2_i
-    S = None if output_final_state is False else S
-    return rearrange(o, 'b h n c d -> b h (n c) d'), S
+    pass
+    # # FIXME: hypnopump@ needs working!
+    # b, h, l, d_k = r.shape
+    # d_v = v.shape[-1]
+    # r = r * (d_k ** -0.5)
+    # v = v
+    # assert l % chunk_size == 0
+    #
+    # # note that diagonal is masked.
+    # mask = torch.triu(torch.ones(chunk_size, chunk_size, dtype=torch.bool, device=r.device), diagonal=0)
+    # r, w, k, v, alpha, beta = map(
+    #   lambda x: rearrange(x, 'b h (n c) d -> b h n c d', c=chunk_size), [r, w, k, v, alpha, beta]
+    # )
+    #
+    # v2 = (alpha @ k.transpose(-1, -2)).masked_fill_(mask, 0) @ v
+    # attn = (alpha @ beta.transpose(-1, -2)).masked_fill(mask, 0)
+    # for i in range(1, chunk_size):
+    #     attn[..., i, :i] = attn[..., i, :i] + (attn[..., i, :, None].clone() * attn[..., :, :i].clone()).sum(-2)
+    #
+    # # FIXME: hypnopump@ needs working!
+    # # FIXME: add decay in the diagonal' idk!
+    # attn = attn + torch.eye(chunk_size, dtype=torch.float, device=r.device)
+    # u = attn @ v2
+    # w = attn @ alpha
+    # S = k.new_zeros(b, h, d_k, d_v)
+    # o = torch.zeros_like(v)
+    #
+    # if initial_state is not None:
+    #     S += initial_state
+    #
+    # mask = torch.triu(torch.ones(chunk_size, chunk_size, dtype=torch.bool, device=r.device), diagonal=1)
+    # for i in range(0, l // chunk_size):
+    #     r_i, k_i, v_i, u_i, w_i, beta_i = r[:, :, i], k[:, :, i], v[:, :, i], u[:, :, i], w[:, :, i], beta[:, :, i]
+    #     o_1 = (r_i @ k_i.transpose(-1, -2)).masked_fill_(mask, 0) @ v_i
+    #     v2_i = u_i + w_i @ S
+    #     o_2 = (r_i @ beta_i.transpose(-1, -2)).masked_fill_(mask, 0) @ (v2_i)
+    #     o_3 = r_i @ S
+    #     o[:, :, i] = o_1 + o_2 + o_3
+    #     # FIXME: hypnopump@ needs working!
+    #     # FIXME: need to play scaled decay here
+    #     S = S + k_i.transpose(-1, -2) @ v_i + beta_i.transpose(-1, -2) @ v2_i
+    # S = None if output_final_state is False else S
+    # return rearrange(o, 'b h n c d -> b h (n c) d'), S
 
 
 if __name__ == '__main__':
@@ -96,8 +100,8 @@ if __name__ == '__main__':
     v_grad, v.grad = v.grad, None
     beta_grad, beta.grad = beta.grad, None
 
-    o2, s2 = dplr_chunkwise(r, k, v, -alpha, beta)
-    o2.backward(do)
+    # o2, s2 = dplr_chunkwise(r, k, v, -alpha, beta)
+    # o2.backward(do)
     # assert torch.allclose(o, o2, atol=1e-4), breakpoint()
     # assert torch.allclose(s, s2, atol=1e-4), breakpoint()
     # assert torch.allclose(r.grad, r_grad, atol=1e-4), breakpoint()

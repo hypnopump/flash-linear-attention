@@ -397,7 +397,7 @@ def fused_recurrent_iplr2(
             values of shape `(B, H, T, V)`
         alpha1 (torch.Tensor):
             alphas of shape `(B, H, T, K)`
-        beta2 (torch.Tensor):
+        beta1 (torch.Tensor):
              betas of shape `(B, H, T, K)`
         alpha2 (torch.Tensor):
             alphas of shape `(B, H, T, K)`
